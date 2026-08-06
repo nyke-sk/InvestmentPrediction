@@ -164,7 +164,7 @@ async def parse_portfolio(
             raise HTTPException(status_code=400, detail="Invalid JSON string in raw_holdings.")
 
     macro_data = await mcp_client.get_macro_pulse()
-    diagnostics = calculate_portfolio_diagnostics(holdings_list, macro_data.get("threat_score", 35.0))
+    diagnostics = await asyncio.to_thread(calculate_portfolio_diagnostics, holdings_list, macro_data.get("threat_score", 35.0))
     return diagnostics
 
 @app.post("/api/recommend-inr", response_model=RecommendationResponse)
@@ -174,7 +174,8 @@ async def get_recommendations(req: RecommendationRequest):
     """
     try:
         macro_data = await mcp_client.get_macro_pulse()
-        recs = generate_recommendations(
+        recs = await asyncio.to_thread(
+            generate_recommendations,
             available_capital_inr=req.available_capital_inr,
             risk_profile=req.risk_profile,
             existing_holdings=req.holdings,
@@ -195,7 +196,8 @@ async def get_target_selling_point(req: TargetSellingPointRequest):
     """
     try:
         macro_data = await mcp_client.get_macro_pulse()
-        result = calculate_target_selling_points(
+        result = await asyncio.to_thread(
+            calculate_target_selling_points,
             capital_inr=req.capital_inr,
             target_profit_inr=req.target_profit_inr,
             time_horizon_months=req.time_horizon_months,
@@ -218,7 +220,8 @@ async def get_ticker_history(
     evaluating historical target price hit dates and day velocities.
     """
     try:
-        res = fetch_ticker_price_history(
+        res = await asyncio.to_thread(
+            fetch_ticker_price_history,
             ticker=ticker,
             period=period,
             target_profit_pct=target_profit_pct
@@ -361,7 +364,7 @@ async def execute_broker_orders(req: BrokerExecuteRequest):
 @app.get("/api/tickers")
 async def get_tickers():
     """Retrieve full raw ticker dataset from JSON storage."""
-    tickers = get_all_tickers()
+    tickers = await asyncio.to_thread(get_all_tickers)
     return {"status": "SUCCESS", "total_tickers": len(tickers), "tickers": tickers}
 
 @app.post("/api/tickers")
@@ -369,7 +372,7 @@ async def save_tickers(req: TickerSaveRequest):
     """Update and persist modified ticker dataset in JSON database."""
     try:
         raw_items = [item.model_dump() for item in req.tickers]
-        res = save_ticker_dataset(raw_items)
+        res = await asyncio.to_thread(save_ticker_dataset, raw_items)
         return res
     except Exception as e:
         logger.error(f"Error saving ticker dataset: {e}")
@@ -379,7 +382,7 @@ async def save_tickers(req: TickerSaveRequest):
 async def sync_tickers():
     """On-demand synchronization of Top 100 NSE & Top 500 BSE securities dataset."""
     try:
-        res = sync_top_tickers_dataset()
+        res = await asyncio.to_thread(sync_top_tickers_dataset)
         return res
     except Exception as e:
         logger.error(f"Error syncing ticker dataset: {e}")
