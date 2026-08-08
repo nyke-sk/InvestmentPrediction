@@ -7,3 +7,6 @@
 ## 2024-05-19 - FastAPI Event Loop Blocking
 **Learning:** In the FastAPI backend, using synchronous data processing functions like `pandas.read_csv` and `pandas.read_excel` within an `async def` endpoint directly blocks the main asyncio event loop, causing severe latency degradation under load for all concurrent API requests.
 **Action:** Always offload synchronous blocking operations inside `async def` endpoints using `await asyncio.to_thread(func, *args)`.
+## 2024-08-08 - FastAPI Event Loop Blocking by heavy operations
+**Learning:** It is not only `pandas` that blocks the FastAPI asyncio event loop. Heavy CPU-bound quant operations (like portfolio diagnostics, recommendation generation, target calculation) and synchronous external network requests (like fetching ticker price history via `yfinance`) directly block the main async event loop. This degrades latency for all concurrent API requests.
+**Action:** Always offload these heavy synchronous operations inside `async def` endpoints using `await asyncio.to_thread(func, *args)`.

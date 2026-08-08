@@ -164,7 +164,8 @@ async def parse_portfolio(
             raise HTTPException(status_code=400, detail="Invalid JSON string in raw_holdings.")
 
     macro_data = await mcp_client.get_macro_pulse()
-    diagnostics = calculate_portfolio_diagnostics(holdings_list, macro_data.get("threat_score", 35.0))
+    # ⚡ Bolt Optimization: Offload blocking portfolio diagnostics to separate thread
+    diagnostics = await asyncio.to_thread(calculate_portfolio_diagnostics, holdings_list, macro_data.get("threat_score", 35.0))
     return diagnostics
 
 @app.post("/api/recommend-inr", response_model=RecommendationResponse)
@@ -174,12 +175,14 @@ async def get_recommendations(req: RecommendationRequest):
     """
     try:
         macro_data = await mcp_client.get_macro_pulse()
-        recs = generate_recommendations(
-            available_capital_inr=req.available_capital_inr,
-            risk_profile=req.risk_profile,
-            existing_holdings=req.holdings,
-            macro_data=macro_data,
-            recommendation_count=req.count
+        # ⚡ Bolt Optimization: Offload heavy blocking recommendation generation to separate thread
+        recs = await asyncio.to_thread(
+            generate_recommendations,
+            req.available_capital_inr,
+            req.risk_profile,
+            req.holdings,
+            macro_data,
+            req.count
         )
         return recs
     except Exception as e:
@@ -195,12 +198,14 @@ async def get_target_selling_point(req: TargetSellingPointRequest):
     """
     try:
         macro_data = await mcp_client.get_macro_pulse()
-        result = calculate_target_selling_points(
-            capital_inr=req.capital_inr,
-            target_profit_inr=req.target_profit_inr,
-            time_horizon_months=req.time_horizon_months,
-            risk_profile=req.risk_profile,
-            macro_data=macro_data
+        # ⚡ Bolt Optimization: Offload blocking target selling point calculations to separate thread
+        result = await asyncio.to_thread(
+            calculate_target_selling_points,
+            req.capital_inr,
+            req.target_profit_inr,
+            req.time_horizon_months,
+            req.risk_profile,
+            macro_data
         )
         return result
     except Exception as e:
@@ -218,10 +223,12 @@ async def get_ticker_history(
     evaluating historical target price hit dates and day velocities.
     """
     try:
-        res = fetch_ticker_price_history(
-            ticker=ticker,
-            period=period,
-            target_profit_pct=target_profit_pct
+        # ⚡ Bolt Optimization: Offload blocking yfinance price history fetch to separate thread
+        res = await asyncio.to_thread(
+            fetch_ticker_price_history,
+            ticker,
+            period,
+            target_profit_pct
         )
         return res
     except Exception as e:
